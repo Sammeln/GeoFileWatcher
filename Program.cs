@@ -111,13 +111,14 @@ namespace GeoFileWatcher
             // Расширение уже известно (.geo или .dxf)
             var nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
             
-            // Находим первую точку для разделения обозначения и наименования
-            var firstDotIndex = nameWithoutExtension.IndexOf('.');
+            // Находим последнюю точку для разделения обозначения и наименования
+            // Обозначение может содержать точки (например, 12345.01.01)
+            var lastDotIndex = nameWithoutExtension.LastIndexOf('.');
 
-            if (firstDotIndex > 0)
+            if (lastDotIndex > 0)
             {
-                designation = nameWithoutExtension.Substring(0, firstDotIndex);
-                name = nameWithoutExtension.Substring(firstDotIndex + 1);
+                designation = nameWithoutExtension.Substring(0, lastDotIndex);
+                name = nameWithoutExtension.Substring(lastDotIndex + 1);
             }
             else
             {
@@ -212,6 +213,7 @@ namespace GeoFileWatcher
             };
 
             _watcher.Created += OnFileCreated;
+            _watcher.Deleted += OnFileDeleted;
             _watcher.EnableRaisingEvents = true;
 
             Console.WriteLine("FileWatcher запущен. Ожидание новых файлов...");
@@ -279,6 +281,39 @@ namespace GeoFileWatcher
             }
             _designationMap[designation].Add(newFile);
             _existingFiles.Add(newFile);
+        }
+
+        static void OnFileDeleted(object sender, FileSystemEventArgs e)
+        {
+            // Игнорируем файлы не тех расширений
+            if (!e.Name.EndsWith(".geo", StringComparison.OrdinalIgnoreCase) && 
+                !e.Name.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var fileInfo = new FileInfo(e.FullPath);
+            
+            // Удаляем файл из списка существующих файлов
+            var fileToRemove = _existingFiles.FirstOrDefault(f => f.FullName == e.FullPath);
+            if (fileToRemove != null)
+            {
+                _existingFiles.Remove(fileToRemove);
+                Console.WriteLine($"Файл удален: {e.Name}");
+
+                // Обновляем карту обозначений
+                ParseFileName(e.Name, out string designation, out _);
+                if (_designationMap.TryGetValue(designation, out var filesList))
+                {
+                    filesList.RemoveAll(f => f.FullName == e.FullPath);
+                    
+                    // Если список пуст, удаляем запись из карты
+                    if (filesList.Count == 0)
+                    {
+                        _designationMap.Remove(designation);
+                    }
+                }
+            }
         }
     }
 }
