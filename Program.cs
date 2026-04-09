@@ -80,7 +80,7 @@ namespace GeoFileWatcher
                     Console.WriteLine($"Обозначение: {dup.Key}");
                     foreach (var file in dup.Value)
                     {
-                        Console.WriteLine($"  - {file.Name}");
+                        Console.WriteLine($"  - {file.Name} (Дата создания: {file.CreationTime:dd.MM.yyyy HH:mm:ss})");
                     }
                     Console.WriteLine();
                 }
@@ -160,13 +160,37 @@ namespace GeoFileWatcher
                 
                 for (int i = 0; i < kvp.Value.Count; i++)
                 {
-                    Console.WriteLine($"{i + 1}. {kvp.Value[i].Name}");
+                    Console.WriteLine($"{i + 1}. {kvp.Value[i].Name} (Дата создания: {kvp.Value[i].CreationTime:dd.MM.yyyy HH:mm:ss})");
                 }
 
-                Console.WriteLine("Введите номера файлов для удаления (через запятую), или оставьте пустым для пропуска: ");
+                Console.WriteLine("Введите номера файлов для удаления (через запятую), '*' для удаления всех, или оставьте пустым для пропуска: ");
                 var input = Console.ReadLine()?.Trim();
 
-                if (!string.IsNullOrEmpty(input))
+                if (string.IsNullOrEmpty(input))
+                {
+                    continue;
+                }
+
+                if (input == "*")
+                {
+                    // Удаляем все файлы кроме первого (или можно удалить все, но обычно оставляют один)
+                    // В данном случае удаляем все, так как пользователь явно указал '*'
+                    for (int i = kvp.Value.Count - 1; i >= 0; i--)
+                    {
+                        var fileToDelete = kvp.Value[i];
+                        try
+                        {
+                            File.Delete(fileToDelete.FullName);
+                            _existingFiles.Remove(fileToDelete);
+                            Console.WriteLine($"Удален файл: {fileToDelete.Name}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Ошибка при удалении {fileToDelete.Name}: {ex.Message}");
+                        }
+                    }
+                }
+                else
                 {
                     var indices = input.Split(',')
                         .Select(s => int.TryParse(s.Trim(), out var n) ? n : -1)
